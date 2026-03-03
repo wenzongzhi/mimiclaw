@@ -80,6 +80,13 @@ static struct {
     struct arg_end *end;
 } feishu_creds_args;
 
+/* --- feishu_send command --- */
+static struct {
+    struct arg_str *receive_id;
+    struct arg_str *text;
+    struct arg_end *end;
+} feishu_send_args;
+
 static int cmd_set_feishu_creds(int argc, char **argv)
 {
     int nerrors = arg_parse(argc, argv, (void **)&feishu_creds_args);
@@ -91,6 +98,20 @@ static int cmd_set_feishu_creds(int argc, char **argv)
                           feishu_creds_args.app_secret->sval[0]);
     printf("Feishu credentials saved.\n");
     return 0;
+}
+
+static int cmd_feishu_send(int argc, char **argv)
+{
+    int nerrors = arg_parse(argc, argv, (void **)&feishu_send_args);
+    if (nerrors != 0) {
+        arg_print_errors(stderr, feishu_send_args.end, argv[0]);
+        return 1;
+    }
+
+    esp_err_t err = feishu_send_message(feishu_send_args.receive_id->sval[0],
+                                        feishu_send_args.text->sval[0]);
+    printf("feishu_send status: %s\n", esp_err_to_name(err));
+    return (err == ESP_OK) ? 0 : 1;
 }
 
 /* --- set_api_key command --- */
@@ -651,6 +672,18 @@ esp_err_t serial_cli_init(void)
         .argtable = &feishu_creds_args,
     };
     esp_console_cmd_register(&feishu_creds_cmd);
+
+    /* feishu_send */
+    feishu_send_args.receive_id = arg_str1(NULL, NULL, "<receive_id>", "Feishu open_id/chat_id");
+    feishu_send_args.text = arg_str1(NULL, NULL, "<text>", "Text message (quote if contains spaces)");
+    feishu_send_args.end = arg_end(2);
+    esp_console_cmd_t feishu_send_cmd = {
+        .command = "feishu_send",
+        .help = "Send Feishu text: feishu_send <open_id|chat_id> \"hello\"",
+        .func = &cmd_feishu_send,
+        .argtable = &feishu_send_args,
+    };
+    esp_console_cmd_register(&feishu_send_cmd);
 
     /* set_api_key */
     api_key_args.key = arg_str1(NULL, NULL, "<key>", "LLM API key");
